@@ -1,98 +1,291 @@
+# NestJS Microservices Architecture
+
 <p align="center">
   <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
 </p>
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
-
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
-
 ## Description
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+This is a production-ready **NestJS microservices monorepo** that demonstrates a scalable distributed system architecture. The project implements a communication pattern using **RabbitMQ** (AMQP) for inter-service messaging, with an API Gateway acting as the entry point for all client requests.
 
-## Project setup
+## Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                           Clients                                    │
+└─────────────────────────────┬───────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  Gateway Service (Port 3000)                                        │
+│  ├── JWT Authentication (Clerk)                                     │
+│  ├── User Management (MongoDB)                                     │
+│  └── Routes requests to microservices via RabbitMQ                 │
+└─────────────────────────────┬───────────────────────────────────────┘
+                              │
+              ┌───────────────┼───────────────┐
+              ▼               ▼               ▼
+    ┌───────────────┐ ┌───────────────┐ ┌───────────────┐
+    │    Catalog    │ │     Media     │ │    Search     │
+    │   Service    │ │   Service     │ │   Service    │
+    │  (RabbitMQ)  │ │  (RabbitMQ)  │ │  (RabbitMQ)  │
+    └───────────────┘ └───────────────┘ └───────────────┘
+```
+
+## Services
+
+| Service | Type | Port | Description |
+|---------|------|------|-------------|
+| **Gateway** | API Gateway | 3000 | Main entry point, handles auth, routes to microservices |
+| **Catalog** | Microservice | - | RabbitMQ consumer for catalog operations |
+| **Media** | Microservice | - | RabbitMQ consumer for media operations |
+| **Search** | Microservice | - | RabbitMQ consumer for search operations |
+
+## Technology Stack
+
+- **Framework**: [NestJS](https://nestjs.com/) v11
+- **Language**: TypeScript
+- **Message Broker**: RabbitMQ (AMQP)
+- **Database**: MongoDB with Mongoose
+- **Authentication**: Clerk (JWT)
+- **Architecture**: Microservices with RabbitMQ transport
+
+## Prerequisites
+
+Before running this project, ensure you have the following installed:
+
+- Node.js (v18+)
+- npm or yarn
+- RabbitMQ (running on localhost:5672)
+- MongoDB (local or Atlas)
+
+## Project Structure
+
+```
+microservices/
+├── apps/
+│   ├── gateway/          # API Gateway with auth & routing
+│   │   └── src/
+│   │       ├── auth/     # JWT authentication (Clerk)
+│   │       └── users/    # User management (MongoDB)
+│   ├── catalog/          # Catalog microservice
+│   ├── media/            # Media microservice
+│   ├── search/           # Search microservice
+│   └── microservices/    # Base microservice app
+├── .env                  # Environment variables
+├── nest-cli.json         # NestJS CLI configuration (monorepo)
+└── package.json          # Root dependencies
+```
+
+## Environment Variables
+
+Create a `.env` file in the root directory with the following variables:
+
+```env
+# Gateway
+GATEWAY_PORT=3000
+
+# RabbitMQ
+RABBITMQ_URL=amqp://localhost:5672
+CATALOG_QUEUE=catalog_queue
+MEDIA_QUEUE=media_queue
+SEARCH_QUEUE=search_queue
+
+# Database
+MONGODB_URL=mongodb://localhost:27017/your-database
+
+# Authentication (Clerk)
+CLERK_PUBLISHABLE_KEY=pk_test_...
+CLERK_SECRET_KEY=sk_test_...
+```
+
+## Installation
 
 ```bash
+# Install dependencies
 $ npm install
 ```
 
-## Compile and run the project
+## Running the Application
+
+### Development Mode
+
+Start the Gateway (must be run first):
+```bash
+$ npm run start:gateway
+# or with watch mode
+$ npm run start:gateway --watch
+```
+
+Start individual microservices:
 
 ```bash
-# development
-$ npm run start
+# Start Catalog Service
+$ npm run start:catalog
 
-# watch mode
+# Start Media Service
+$ npm run start:media
+
+# Start Search Service
+$ npm run start:search
+```
+
+Or start all services using NestJS CLI:
+
+```bash
+# Start all apps in development
 $ npm run start:dev
 
-# production mode
-$ npm run start:prod
+# Start a specific app
+$ npm run start --project=gateway
 ```
 
-## Run tests
+### Health Check
+
+Once running, verify all services are healthy:
 
 ```bash
-# unit tests
+curl http://localhost:3000/health
+```
+
+Expected response:
+```json
+{
+  "ok": true,
+  "gateway": { ... },
+  "services": {
+    "catalog": { "ok": true, ... },
+    "media": { "ok": true, ... },
+    "search": { "ok": true, ... }
+  }
+}
+```
+
+## Testing
+
+```bash
+# Unit tests
 $ npm run test
 
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
+# Test coverage
 $ npm run test:cov
+
+# E2E tests
+$ npm run test:e2e
 ```
+
+## Inter-Service Communication
+
+The Gateway communicates with microservices via **RabbitMQ** message patterns:
+
+```typescript
+// Example: Sending message to Catalog service
+this.catalogClient.send('catalog.operation', { data: 'payload' });
+```
+
+### Message Patterns
+
+- **Request-Response**: `client.send(pattern, data)` - await response
+- **Event Broadcasting**: `client.emit(event, data)` - fire and forget
+
+## Authentication
+
+The Gateway implements JWT authentication using **Clerk**:
+
+- [`auth.service.ts`](apps/gateway/src/auth/auth.service.ts) - Auth logic
+- [`jwt-auth-guard.ts`](apps/gateway/src/auth/jwt-auth-guard.ts) - Route protection
+- [`users.service.ts`](apps/gateway/src/users/users.service.ts) - User data management
+
+### Protected Routes
+
+Use the `@Public()` decorator for routes that don't require authentication:
+```typescript
+@Controller()
+export class ExampleController {
+  @Public()
+  @Get('public')
+  publicRoute() {}
+  
+  @Get('protected')
+  @UseGuards(JwtAuthGuard)
+  protectedRoute() {}
+}
+```
+
+## API Documentation
+
+### Gateway Endpoints
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| GET | `/health` | Health check for all services | No |
+| GET | `/catalog/*` | Proxy to Catalog service | Yes |
+| GET | `/media/*` | Proxy to Media service | Yes |
+| GET | `/search/*` | Proxy to Search service | Yes |
 
 ## Deployment
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+### Docker Compose (Recommended)
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+Create a `docker-compose.yml` for easy deployment:
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+```yaml
+version: '3.8'
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+  
+  mongodb:
+    image: mongo
+    ports:
+      - "27017:27017"
+
+  gateway:
+    build: .
+    command: npm run start:gateway
+    ports:
+      - "3000:3000"
+    environment:
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+      - MONGODB_URL=mongodb://mongodb:27017/app
+
+  catalog:
+    build: .
+    command: npm run start:catalog
+    environment:
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+
+  media:
+    build: .
+    command: npm run start:media
+    environment:
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+
+  search:
+    build: .
+    command: npm run start:search
+    environment:
+      - RABBITMQ_URL=amqp://rabbitmq:5672
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### Production Considerations
 
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+1. **RabbitMQ**: Use a cluster for high availability
+2. **MongoDB**: Use replica set for production
+3. **Gateway**: Add rate limiting and caching
+4. **Monitoring**: Integrate with Prometheus/Grafana
+5. **Logging**: Use structured logging (e.g., Pino)
 
 ## License
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+MIT License - feel free to use this project for learning or commercial purposes.
+
+## Resources
+
+- [NestJS Documentation](https://docs.nestjs.com)
+- [NestJS Microservices](https://docs.nestjs.com/microservices/microservices-basics)
+- [RabbitMQ Transport](https://docs.nestjs.com/microservices/rabbitmq)
+- [Clerk Authentication](https://clerk.com)
