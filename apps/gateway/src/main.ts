@@ -11,7 +11,7 @@ async function bootstrap() {
 
   app.enableShutdownHooks();
 
-  const port= Number(process.env.GATEWAY_PORT ?? 3000)
+  const port= Number(process.env.GATEWAY_PORT ?? 4000)
 
   await app.listen(port)
 
