@@ -6,6 +6,7 @@ import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { UserModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
+import { ProductHttpController } from './products/product.controlller';
 
 @Module({
   imports: [
@@ -54,7 +55,7 @@ import { AuthModule } from './auth/auth.module';
       },
     ])
   ],
-  controllers: [GatewayController],
+  controllers: [GatewayController,ProductHttpController],
   providers: [GatewayService],
 })
 export class GatewayModule {}

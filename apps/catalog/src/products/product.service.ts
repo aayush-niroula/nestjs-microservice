@@ -22,15 +22,15 @@ export class ProductService{
     }){
 
         if(!input.name || !input.description){
-            rpcBadRequest('name and description are required ')
+            throw rpcBadRequest('name and description are required ')
         }
 
         if(typeof input.price != "number" || Number.isNaN(input.price)|| input.price < 0){
-            rpcBadRequest('Price must be a valid number greater than 0')
+           throw rpcBadRequest('Price must be a valid number greater than 0')
         }
 
         if(input.status  && input.status !== "DRAFT" && input.status !== "ACTIVE"){
-            rpcBadRequest("Status must be either DRAFT or Active")
+          throw  rpcBadRequest("Status must be either DRAFT or Active")
         }
 
         const newlyCreatedProduct = await this.productModel.create({
@@ -58,7 +58,7 @@ export class ProductService{
 
         const product = await this.productModel.findById(input.id).exec()
         if(!product){
-            rpcNotFound("Product is not found")
+           throw rpcNotFound("Product is not found")
         }
 
         return product

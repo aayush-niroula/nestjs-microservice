@@ -12,18 +12,22 @@ export class RpcAllExceptioFilter extends BaseRpcExceptionFilter{
             return super.catch(exception,host)
         }
     
-        const status =exception.getStatus();
-        const ctx = host.switchToHttp();
-        const response = ctx.getResponse<Response>();
+        // Check if exception has getStatus method (HTTP exceptions only)
+        // RPC exceptions don't have this method
+        if (typeof exception.getStatus === 'function') {
+            const status = exception.getStatus();
+            const ctx = host.switchToHttp();
+            const response = ctx.getResponse<Response>();
 
-        if(status ==400){
-            const payload:RpcErrorPayload={
-                code:'VALIDATION_ERROR',
-                message:"Validation failed",
-                details:response
+            if(status == 400){
+                const payload:RpcErrorPayload={
+                    code:'VALIDATION_ERROR',
+                    message:"Validation failed",
+                    details:response
 
+                }
+                return super.catch(new RpcException(payload),host)
             }
-            return super.catch(new RpcException(payload),host)
         }
 
         const payload :RpcErrorPayload={
