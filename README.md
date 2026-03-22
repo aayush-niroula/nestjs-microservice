@@ -6,7 +6,7 @@
 
 ## Description
 
-This is a production-ready **NestJS microservices monorepo** that demonstrates a scalable distributed system architecture. The project implements a communication pattern using **RabbitMQ** (AMQP) for inter-service messaging, with an API Gateway acting as the entry point for all client requests.
+This is a production-ready **NestJS microservices monorepo** that demonstrates a scalable distributed system architecture. The project implements communication patterns using **RabbitMQ** (AMQP) for event-based messaging and **TCP** for direct microservice communication.
 
 ## Architecture Overview
 
@@ -17,18 +17,19 @@ This is a production-ready **NestJS microservices monorepo** that demonstrates a
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│  Gateway Service (Port 3000)                                        │
+│  Gateway Service (Port 4000)                                        │
 │  ├── JWT Authentication (Clerk)                                     │
 │  ├── User Management (MongoDB)                                     │
-│  └── Routes requests to microservices via RabbitMQ                 │
+│  ├── Products API                                                  │
+│  └── Routes requests to microservices via RabbitMQ/TCP             │
 └─────────────────────────────┬───────────────────────────────────────┘
                               │
               ┌───────────────┼───────────────┐
               ▼               ▼               ▼
     ┌───────────────┐ ┌───────────────┐ ┌───────────────┐
     │    Catalog    │ │     Media     │ │    Search     │
-    │   Service    │ │   Service     │ │   Service    │
-    │  (RabbitMQ)  │ │  (RabbitMQ)  │ │  (RabbitMQ)  │
+    │   Service    │ │   Service    │ │   Service    │
+    │  (TCP:4011)  │ │  (TCP:4013)  │ │  (TCP:4012)  │
     └───────────────┘ └───────────────┘ └───────────────┘
 ```
 
@@ -36,19 +37,21 @@ This is a production-ready **NestJS microservices monorepo** that demonstrates a
 
 | Service | Type | Port | Description |
 |---------|------|------|-------------|
-| **Gateway** | API Gateway | 3000 | Main entry point, handles auth, routes to microservices |
-| **Catalog** | Microservice | - | RabbitMQ consumer for catalog operations |
-| **Media** | Microservice | - | RabbitMQ consumer for media operations |
-| **Search** | Microservice | - | RabbitMQ consumer for search operations |
+| **Gateway** | API Gateway | 4000 | Main entry point, handles auth, routes to microservices |
+| **Catalog** | Microservice | 4011 | TCP consumer for catalog/product operations |
+| **Media** | Microservice | 4013 | TCP consumer for media operations |
+| **Search** | Microservice | 4012 | TCP consumer for search operations |
 
 ## Technology Stack
 
 - **Framework**: [NestJS](https://nestjs.com/) v11
 - **Language**: TypeScript
 - **Message Broker**: RabbitMQ (AMQP)
+- **Transport**: TCP + RabbitMQ
 - **Database**: MongoDB with Mongoose
 - **Authentication**: Clerk (JWT)
-- **Architecture**: Microservices with RabbitMQ transport
+- **Architecture**: Microservices with TCP/RabbitMQ transport
+- **Shared Library**: `@app/rpc` - RPC helpers and exception filters
 
 ## Prerequisites
 
@@ -67,11 +70,18 @@ microservices/
 │   ├── gateway/          # API Gateway with auth & routing
 │   │   └── src/
 │   │       ├── auth/     # JWT authentication (Clerk)
-│   │       └── users/    # User management (MongoDB)
-│   ├── catalog/          # Catalog microservice
-│   ├── media/            # Media microservice
-│   ├── search/           # Search microservice
+│   │       ├── users/    # User management (MongoDB)
+│   │       └── products/ # Product API endpoints
+│   ├── catalog/          # Catalog microservice (TCP port 4011)
+│   ├── media/            # Media microservice (TCP port 4013)
+│   ├── search/           # Search microservice (TCP port 4012)
 │   └── microservices/    # Base microservice app
+├── libs/
+│   └── rpc/              # Shared RPC library
+│       └── src/
+│           ├── rpc-exception.filter.ts  # Exception handling
+│           ├── rpc.helpers.ts           # RPC utilities
+│           └── http/                   # HTTP error mapping
 ├── .env                  # Environment variables
 ├── nest-cli.json         # NestJS CLI configuration (monorepo)
 └── package.json          # Root dependencies
@@ -83,7 +93,12 @@ Create a `.env` file in the root directory with the following variables:
 
 ```env
 # Gateway
-GATEWAY_PORT=3000
+GATEWAY_PORT=4000
+
+# Microservices (TCP Ports)
+CATALOG_TCP_PORT=4011
+SEARCH_TCP_PORT=4012
+MEDIA_TCP_PORT=4013
 
 # RabbitMQ
 RABBITMQ_URL=amqp://localhost:5672
@@ -93,6 +108,7 @@ SEARCH_QUEUE=search_queue
 
 # Database
 MONGODB_URL=mongodb://localhost:27017/your-database
+MONGODB_URL_CATALOG=mongodb://localhost:27017/catalog-database
 
 # Authentication (Clerk)
 CLERK_PUBLISHABLE_KEY=pk_test_...
@@ -110,34 +126,34 @@ $ npm install
 
 ### Development Mode
 
-Start the Gateway (must be run first):
+Start all services with watch mode:
 ```bash
-$ npm run start:gateway
-# or with watch mode
-$ npm run start:gateway --watch
+$ npm run start:dev
 ```
 
-Start individual microservices:
-
+Start individual services:
 ```bash
+# Start Gateway (must be run first)
+$ npm run start --project=gateway
+
 # Start Catalog Service
-$ npm run start:catalog
+$ npm run start --project=catalog
 
 # Start Media Service
-$ npm run start:media
+$ npm run start --project=media
 
 # Start Search Service
-$ npm run start:search
+$ npm run start --project=search
 ```
 
-Or start all services using NestJS CLI:
+### Production Mode
 
 ```bash
-# Start all apps in development
-$ npm run start:dev
+# Build all projects
+$ npm run build
 
-# Start a specific app
-$ npm run start --project=gateway
+# Start in production
+$ npm run start:prod
 ```
 
 ### Health Check
@@ -145,7 +161,7 @@ $ npm run start --project=gateway
 Once running, verify all services are healthy:
 
 ```bash
-curl http://localhost:3000/health
+curl http://localhost:4000/health
 ```
 
 Expected response:
@@ -176,17 +192,28 @@ $ npm run test:e2e
 
 ## Inter-Service Communication
 
-The Gateway communicates with microservices via **RabbitMQ** message patterns:
+The Gateway communicates with microservices via **TCP** and **RabbitMQ** message patterns:
 
 ```typescript
-// Example: Sending message to Catalog service
+// Example: Sending message to Catalog service via TCP
 this.catalogClient.send('catalog.operation', { data: 'payload' });
+
+// Example: Emitting event via RabbitMQ
+this.catalogClient.emit('catalog.event', { data: 'payload' });
 ```
 
 ### Message Patterns
 
-- **Request-Response**: `client.send(pattern, data)` - await response
-- **Event Broadcasting**: `client.emit(event, data)` - fire and forget
+- **Request-Response**: `client.send(pattern, data)` - await response via TCP
+- **Event Broadcasting**: `client.emit(event, data)` - fire and forget via RabbitMQ
+
+### RPC Library
+
+The project includes a shared RPC library (`@app/rpc`) with:
+
+- [`rpc-exception.filter.ts`](libs/rpc/src/rpc-exception.filter.ts) - Global exception filter for RPC
+- [`rpc.helpers.ts`](libs/rpc/src/rpc.helpers.ts) - Helper utilities
+- [`rpc.types.ts`](libs/rpc/src/rpc.types.ts) - TypeScript types
 
 ## Authentication
 
@@ -219,9 +246,26 @@ export class ExampleController {
 | Method | Endpoint | Description | Auth Required |
 |--------|----------|-------------|---------------|
 | GET | `/health` | Health check for all services | No |
+| GET | `/products` | List products | Yes |
+| GET | `/products/:id` | Get product by ID | Yes |
+| POST | `/products` | Create product | Yes (Admin) |
+| PUT | `/products/:id` | Update product | Yes (Admin) |
+| DELETE | `/products/:id` | Delete product | Yes (Admin) |
 | GET | `/catalog/*` | Proxy to Catalog service | Yes |
 | GET | `/media/*` | Proxy to Media service | Yes |
 | GET | `/search/*` | Proxy to Search service | Yes |
+
+### Admin-Only Routes
+
+Use the `@Admin()` decorator to restrict routes to admin users:
+```typescript
+@Controller('products')
+export class ProductController {
+  @Admin()
+  @Post()
+  createProduct() {}
+}
+```
 
 ## Deployment
 
@@ -245,30 +289,33 @@ services:
 
   gateway:
     build: .
-    command: npm run start:gateway
+    command: npm run start --project=gateway
     ports:
-      - "3000:3000"
+      - "4000:4000"
     environment:
       - RABBITMQ_URL=amqp://rabbitmq:5672
       - MONGODB_URL=mongodb://mongodb:27017/app
 
   catalog:
     build: .
-    command: npm run start:catalog
+    command: npm run start --project=catalog
     environment:
       - RABBITMQ_URL=amqp://rabbitmq:5672
+      - CATALOG_TCP_PORT=4011
 
   media:
     build: .
-    command: npm run start:media
+    command: npm run start --project=media
     environment:
       - RABBITMQ_URL=amqp://rabbitmq:5672
+      - MEDIA_TCP_PORT=4013
 
   search:
     build: .
-    command: npm run start:search
+    command: npm run start --project=search
     environment:
       - RABBITMQ_URL=amqp://rabbitmq:5672
+      - SEARCH_TCP_PORT=4012
 ```
 
 ### Production Considerations
@@ -288,4 +335,5 @@ MIT License - feel free to use this project for learning or commercial purposes.
 - [NestJS Documentation](https://docs.nestjs.com)
 - [NestJS Microservices](https://docs.nestjs.com/microservices/microservices-basics)
 - [RabbitMQ Transport](https://docs.nestjs.com/microservices/rabbitmq)
+- [TCP Transport](https://docs.nestjs.com/microservices/tcp)
 - [Clerk Authentication](https://clerk.com)
