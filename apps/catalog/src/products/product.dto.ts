@@ -27,3 +27,35 @@ export class GetProductByIdDto{
     @IsString()
     id:string
 }
+
+export class UpdateProductDto{
+    @IsString()
+    @IsOptional()
+    id:string
+    
+    @IsString()
+    @IsOptional()
+    name?: string;
+
+    @IsString()
+    @IsOptional()
+    description?: string;
+
+    @IsNumber()
+    @IsOptional()
+    @Min(0)
+    price?: number;
+
+    @IsString()
+    @IsOptional()
+    status?: ProductStatus;
+
+    @IsString()
+    @IsOptional()
+    imageUrl?: string;
+}
+
+export class DeleteProductDto{
+    @IsString()
+    id:string
+}
